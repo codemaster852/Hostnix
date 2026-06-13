@@ -10,6 +10,8 @@
         const SUPABASE_URL = 'https://zncztttvefahofdeacxf.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_GhwVsgutWW4EpK9Fc_3DQQ_pW_R48LM';
         window.supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+        // Trigger the initial render once the client is ready
+        window.dispatchEvent(new Event('supabase-ready'));
     </script>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen">
@@ -53,11 +55,15 @@
             const appDiv = document.getElementById('app');
 
             if (hash && hash !== '') {
-                // Fullscreen Viewer Mode
-                appDiv.innerHTML = '<div class="flex items-center justify-center h-screen">Loading site...</div>';
-                fetchAndRenderSite(hash);
+                appDiv.innerHTML = '<div class="flex items-center justify-center h-screen text-slate-400 animate-pulse">Loading site...</div>';
+                
+                // Ensure Supabase is initialized before fetching
+                if (window.supabase) {
+                    fetchAndRenderSite(hash);
+                } else {
+                    window.addEventListener('supabase-ready', () => fetchAndRenderSite(hash), { once: true });
+                }
             } else {
-                // Deploy UI Mode
                 appDiv.innerHTML = deployUI;
             }
         }
@@ -73,7 +79,7 @@
                 if (error || !data) throw new Error("Site not found");
 
                 document.getElementById('app').innerHTML = `
-                    <div class="fixed top-0 left-0 w-full h-full z-50">
+                    <div class="fixed top-0 left-0 w-full h-full z-50 bg-white">
                         <iframe id="viewerFrame" class="w-full h-full border-none"></iframe>
                     </div>
                 `;
@@ -85,7 +91,7 @@
                 document.getElementById('app').innerHTML = `
                     <div class="flex flex-col items-center justify-center h-screen p-6 text-center">
                         <h2 class="text-3xl font-bold text-red-500 mb-2">404 - Site Not Found</h2>
-                        <p class="mb-6 text-slate-400">The site "${slug}" does not exist.</p>
+                        <p class="mb-6 text-slate-400">The site "${slug}" does not exist or is currently being updated.</p>
                         <a href="/" class="text-blue-400 hover:underline">Return to Home</a>
                     </div>
                 `;
@@ -118,10 +124,11 @@
                 }));
 
                 try {
-                    const { error } = await window.supabase.from('apps').insert([{ slug, files }]);
+                    const { error } = await window.supabase.from('apps').upsert([{ slug, files }], { onConflict: 'slug' });
                     if (error) throw error;
                     
-                    window.location.hash = slug; // Trigger render via hash change
+                    window.location.hash = slug;
+                    window.location.reload(); // Force reload to ensure new data renders
                 } catch (err) {
                     alert('Deployment failed: ' + err.message);
                     btn.disabled = false;
@@ -131,6 +138,7 @@
         });
 
         window.addEventListener('hashchange', render);
+        window.addEventListener('supabase-ready', render, { once: true });
         render();
     </script>
 </body>
