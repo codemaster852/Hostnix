@@ -1,0 +1,140 @@
+{
+"rewrites": [
+{
+"source": "/(.*)",
+"destination": "/index.html"
+}
+]
+}
+
+
+### 2. Update your `index.html`
+I have modified your JavaScript `render()` function to look at the **URL path** instead of the `?view=` query parameter.
+
+```html:HostNix:index.html
+<!-- ... existing code ... -->
+    <script>
+        const deployUI = `
+            <h1 class="text-3xl font-bold mb-8">Deploy Your Website</h1>
+            <form id="deployForm" class="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl space-y-6">
+                <div>
+                    <label class="block text-sm font-medium mb-2">Unique Domain Name</label>
+                    <div class="flex items-center bg-slate-950 border border-slate-700 rounded-lg overflow-hidden">
+                        <span class="px-4 text-slate-500 text-sm">hostnix.vercel.app/</span>
+                        <input type="text" id="slug" required placeholder="my-awesome-site" class="w-full bg-transparent p-3 outline-none">
+                    </div>
+                </div>
+                <!-- ... existing code (filesContainer) ... -->
+                <div id="filesContainer" class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <label class="block text-sm font-medium">Files</label>
+                        <button type="button" onclick="addFileField()" class="text-blue-400 text-sm hover:underline">+ Add Another File</button>
+                    </div>
+                    <div class="file-row flex gap-2">
+                        <input type="text" placeholder="index.html" class="filename w-1/4 bg-slate-950 border border-slate-700 rounded-lg p-3 outline-none" value="index.html">
+                        <textarea placeholder="File content" class="filecontent w-3/4 bg-slate-950 border border-slate-700 rounded-lg p-3 outline-none font-mono text-sm" rows="3"></textarea>
+                    </div>
+                </div>
+                <button type="submit" id="deployBtn" class="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-lg font-bold transition-all">
+                    Deploy Website
+                </button>
+            </form>
+        `;
+
+        function render() {
+            // Get path, remove the leading slash
+            const path = window.location.pathname.substring(1);
+
+            // If we are at the home page (path is empty), show deploy UI
+            if (!path || path === '') {
+                document.getElementById('app').innerHTML = deployUI;
+            } else {
+                // Otherwise, treat the path as the slug
+                document.getElementById('app').innerHTML = '<div class="text-center">Loading site...</div>';
+                fetchAndRenderSite(path);
+            }
+        }
+        
+        // ... existing code (fetchAndRenderSite) ...
+        async function fetchAndRenderSite(slug) {
+            try {
+                const { data, error } = await window.supabase
+                    .from('apps')
+                    .select('files')
+                    .eq('slug', slug)
+                    .single();
+
+                if (error || !data) throw new Error("Site not found");
+
+                document.getElementById('app').innerHTML = `
+                    <div class="mb-4 flex items-center justify-between">
+                        <h2 class="text-xl font-bold">Viewing: ${slug}</h2>
+                        <a href="/" class="text-blue-400 hover:underline">Return Home</a>
+                    </div>
+                    <iframe id="viewerFrame" class="w-full h-[70vh] bg-white rounded-lg border border-slate-700"></iframe>
+                `;
+
+                const indexFile = data.files.find(f => f.name === 'index.html') || data.files[0];
+                const iframe = document.getElementById('viewerFrame');
+                iframe.srcdoc = indexFile.content;
+            } catch (err) {
+                document.getElementById('app').innerHTML = `
+                    <div class="bg-red-900/20 p-8 rounded-xl border border-red-800 text-center">
+                        <h2 class="text-2xl font-bold text-red-400 mb-2">404 - Site Not Found</h2>
+                        <p class="mb-4">The site "${slug}" does not exist.</p>
+                        <a href="/" class="text-blue-400 hover:underline">Return to Home</a>
+                    </div>
+                `;
+            }
+        }
+
+        // ... existing code (addFileField, event listener) ...
+        function addFileField() {
+            const container = document.getElementById('filesContainer');
+            const div = document.createElement('div');
+            div.className = 'file-row flex gap-2';
+            div.innerHTML = `
+                <input type="text" placeholder="page.html" class="filename w-1/4 bg-slate-950 border border-slate-700 rounded-lg p-3 outline-none">
+                <textarea placeholder="File content" class="filecontent w-3/4 bg-slate-950 border border-slate-700 rounded-lg p-3 outline-none font-mono text-sm" rows="3"></textarea>
+            `;
+            container.appendChild(div);
+        }
+
+        document.addEventListener('submit', async (e) => {
+            if (e.target.id === 'deployForm') {
+                e.preventDefault();
+                const btn = document.getElementById('deployBtn');
+                btn.disabled = true;
+                btn.innerText = 'Deploying...';
+
+                const slug = document.getElementById('slug').value.toLowerCase().replace(/\s+/g, '-');
+                const fileRows = document.querySelectorAll('.file-row');
+                const files = Array.from(fileRows).map(row => ({
+                    name: row.querySelector('.filename').value,
+                    content: row.querySelector('.filecontent').value
+                }));
+
+                try {
+                    const { error } = await window.supabase.from('apps').insert([{ slug, files }]);
+                    if (error) throw error;
+                    
+                    document.getElementById('app').innerHTML = `
+                        <div class="bg-green-900/20 p-8 rounded-xl border border-green-800 text-center">
+                            <h2 class="text-2xl font-bold text-green-400 mb-2">Deployment Successful!</h2>
+                            <p class="mb-6">Your site is live at:</p>
+                            <a href="/${slug}" class="block font-mono bg-slate-900 p-4 rounded-lg text-blue-400 border border-slate-700 hover:bg-slate-800">
+                                https://hostnix.vercel.app/${slug}
+                            </a>
+                        </div>
+                    `;
+                } catch (err) {
+                    alert('Deployment failed: ' + err.message);
+                    btn.disabled = false;
+                    btn.innerText = 'Deploy Website';
+                }
+            }
+        });
+
+        render();
+    </script>
+<!-- ... existing code ... -->
