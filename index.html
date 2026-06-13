@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HostNix | Deploy</title>
+    <title>HostNix | Deploy & View</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script type="module">
         import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -14,48 +14,51 @@
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen">
 
-    <nav class="p-6 border-b border-slate-800 flex justify-between items-center">
-        <a href="/" class="text-xl font-bold bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">HostNix</a>
-    </nav>
-
-    <main class="max-w-5xl mx-auto p-6" id="app"></main>
+    <div id="app"></div>
 
     <script>
         const deployUI = `
-            <h1 class="text-3xl font-bold mb-8">Deploy Your Website</h1>
-            <form id="deployForm" class="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl space-y-6">
-                <div>
-                    <label class="block text-sm font-medium mb-2">Unique Domain Name</label>
-                    <div class="flex items-center bg-slate-950 border border-slate-700 rounded-lg overflow-hidden">
-                        <span class="px-4 text-slate-500 text-sm">hostnix.vercel.app/#</span>
-                        <input type="text" id="slug" required placeholder="my-awesome-site" class="w-full bg-transparent p-3 outline-none">
+            <nav class="p-6 border-b border-slate-800 flex justify-between items-center">
+                <a href="/" class="text-xl font-bold bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">HostNix</a>
+            </nav>
+            <main class="max-w-5xl mx-auto p-6">
+                <h1 class="text-3xl font-bold mb-8">Deploy Your Website</h1>
+                <form id="deployForm" class="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl space-y-6">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Unique Domain Name</label>
+                        <div class="flex items-center bg-slate-950 border border-slate-700 rounded-lg overflow-hidden">
+                            <span class="px-4 text-slate-500 text-sm">hostnix.vercel.app/#</span>
+                            <input type="text" id="slug" required placeholder="my-awesome-site" class="w-full bg-transparent p-3 outline-none">
+                        </div>
                     </div>
-                </div>
-                <div id="filesContainer" class="space-y-4">
-                    <div class="flex justify-between items-center">
-                        <label class="block text-sm font-medium">Files</label>
-                        <button type="button" onclick="addFileField()" class="text-blue-400 text-sm hover:underline">+ Add Another File</button>
+                    <div id="filesContainer" class="space-y-4">
+                        <div class="flex justify-between items-center">
+                            <label class="block text-sm font-medium">Website Files</label>
+                            <button type="button" onclick="addFileField()" class="text-blue-400 text-sm hover:underline">+ Add Another File</button>
+                        </div>
+                        <div class="file-row flex gap-2">
+                            <input type="text" placeholder="index.html" class="filename w-1/4 bg-slate-950 border border-slate-700 rounded-lg p-3 outline-none" value="index.html">
+                            <textarea placeholder="File content" class="filecontent w-3/4 bg-slate-950 border border-slate-700 rounded-lg p-3 outline-none font-mono text-sm" rows="3"></textarea>
+                        </div>
                     </div>
-                    <div class="file-row flex gap-2">
-                        <input type="text" placeholder="index.html" class="filename w-1/4 bg-slate-950 border border-slate-700 rounded-lg p-3 outline-none" value="index.html">
-                        <textarea placeholder="File content" class="filecontent w-3/4 bg-slate-950 border border-slate-700 rounded-lg p-3 outline-none font-mono text-sm" rows="3"></textarea>
-                    </div>
-                </div>
-                <button type="submit" id="deployBtn" class="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-lg font-bold transition-all">
-                    Deploy Website
-                </button>
-            </form>
+                    <button type="submit" id="deployBtn" class="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-lg font-bold transition-all">
+                        Deploy Website
+                    </button>
+                </form>
+            </main>
         `;
 
         function render() {
-            // Get the hash (e.g., #my-site -> my-site)
-            const slug = window.location.hash.substring(1);
+            const hash = window.location.hash.substring(1);
+            const appDiv = document.getElementById('app');
 
-            if (slug && slug !== '') {
-                document.getElementById('app').innerHTML = '<div class="text-center">Loading site...</div>';
-                fetchAndRenderSite(slug);
+            if (hash && hash !== '') {
+                // Fullscreen Viewer Mode
+                appDiv.innerHTML = '<div class="flex items-center justify-center h-screen">Loading site...</div>';
+                fetchAndRenderSite(hash);
             } else {
-                document.getElementById('app').innerHTML = deployUI;
+                // Deploy UI Mode
+                appDiv.innerHTML = deployUI;
             }
         }
 
@@ -69,12 +72,15 @@
 
                 if (error || !data) throw new Error("Site not found");
 
+                // Fullscreen Iframe with Overlay
                 document.getElementById('app').innerHTML = `
-                    <div class="mb-4 flex items-center justify-between">
-                        <h2 class="text-xl font-bold">Viewing: ${slug}</h2>
-                        <a href="/" class="text-blue-400 hover:underline">Return Home</a>
+                    <div class="fixed top-0 left-0 w-full h-full z-50">
+                        <div class="absolute top-4 left-4 z-50 bg-black/50 backdrop-blur rounded-lg p-2 flex gap-4">
+                            <a href="/" class="text-white hover:text-blue-400 font-medium">← Back to HostNix</a>
+                            <span class="text-slate-400 italic">Viewing: ${slug}</span>
+                        </div>
+                        <iframe id="viewerFrame" class="w-full h-full border-none"></iframe>
                     </div>
-                    <iframe id="viewerFrame" class="w-full h-[70vh] bg-white rounded-lg border border-slate-700"></iframe>
                 `;
 
                 const indexFile = data.files.find(f => f.name === 'index.html') || data.files[0];
@@ -82,9 +88,9 @@
                 iframe.srcdoc = indexFile.content;
             } catch (err) {
                 document.getElementById('app').innerHTML = `
-                    <div class="bg-red-900/20 p-8 rounded-xl border border-red-800 text-center">
-                        <h2 class="text-2xl font-bold text-red-400 mb-2">404 - Site Not Found</h2>
-                        <p class="mb-4">The site "${slug}" does not exist.</p>
+                    <div class="flex flex-col items-center justify-center h-screen p-6 text-center">
+                        <h2 class="text-3xl font-bold text-red-500 mb-2">404 - Site Not Found</h2>
+                        <p class="mb-6 text-slate-400">The site "${slug}" does not exist.</p>
                         <a href="/" class="text-blue-400 hover:underline">Return to Home</a>
                     </div>
                 `;
@@ -120,15 +126,7 @@
                     const { error } = await window.supabase.from('apps').insert([{ slug, files }]);
                     if (error) throw error;
                     
-                    document.getElementById('app').innerHTML = `
-                        <div class="bg-green-900/20 p-8 rounded-xl border border-green-800 text-center">
-                            <h2 class="text-2xl font-bold text-green-400 mb-2">Deployment Successful!</h2>
-                            <p class="mb-6">Your site is live at:</p>
-                            <a href="/#${slug}" class="block font-mono bg-slate-900 p-4 rounded-lg text-blue-400 border border-slate-700 hover:bg-slate-800">
-                                https://hostnix.vercel.app/#${slug}
-                            </a>
-                        </div>
-                    `;
+                    window.location.hash = slug; // Trigger render via hash change
                 } catch (err) {
                     alert('Deployment failed: ' + err.message);
                     btn.disabled = false;
@@ -137,7 +135,6 @@
             }
         });
 
-        // Listen for back/forward buttons
         window.addEventListener('hashchange', render);
         render();
     </script>
